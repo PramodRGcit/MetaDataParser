@@ -9,8 +9,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileOwnerAttributeView;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.UserPrincipal;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.annotation.PostConstruct;
 
@@ -29,6 +35,16 @@ public class MetaDataParserApplication {
 		SpringApplication.run(MetaDataParserApplication.class, args);
 	}
 
+	@PostConstruct
+	public void init() {
+		Map<String, String> printMap = new MetaDataParserApplication().getCreationDetails(new File(env.getProperty("inputFileName")));
+		List<String> contents = new ArrayList<>();
+		for (Map.Entry<String, String> map : printMap.entrySet()) {
+			contents.add(map.getKey()+map.getValue());
+		}
+		writeToFile(contents);
+	}
+	
 	/**
 	 * This method returns one of the metadata for any file. Similarly, we could
 	 * add many more.
@@ -36,37 +52,37 @@ public class MetaDataParserApplication {
 	 * @param file
 	 * @return
 	 */
-	public String getCreationDetails(File file) {
+	public Map<String, String> getCreationDetails(File file) {
+		Map<String, String> myReturnMap = new HashMap<>();
 		try {
 			Path p = Paths.get(file.getAbsolutePath());
 			BasicFileAttributes view = Files.getFileAttributeView(p, BasicFileAttributeView.class).readAttributes();
 			FileTime fileTime = view.creationTime();
-			return ("" + new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format((fileTime.toMillis())));
+			myReturnMap.put("Printing Creation Time of input file: ", "" + new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format((fileTime.toMillis())));
+			// your reference
+			FileOwnerAttributeView ownerAttributeView = Files.getFileAttributeView(p, FileOwnerAttributeView.class);
+	        UserPrincipal owner = ownerAttributeView.getOwner();
+	        myReturnMap.put("Printing Owner: ", owner.getName());
+			//
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return "";
+		return myReturnMap;
 	}
-
-	@PostConstruct
-	public void init() {
-		writeToFile("Printing Creation Time of input file: "
-				+ new MetaDataParserApplication().getCreationDetails(new File(env.getProperty("inputFileName"))));
-	}
-
 	/**
 	 * This method writes meta-data to output file.
 	 * 
 	 * @param content
 	 */
-	public void writeToFile(String content) {
+	public void writeToFile(List<String> contents) {
 		BufferedWriter bw = null;
 		FileWriter fw = null;
 		try {
 			fw = new FileWriter(env.getProperty("outputFileName"));
 			bw = new BufferedWriter(fw);
-			bw.write(content);
-			System.out.println("Done");
+			for(String s: contents){
+				bw.write(s+"\n");
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
